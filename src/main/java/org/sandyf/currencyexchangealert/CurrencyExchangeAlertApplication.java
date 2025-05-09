@@ -12,4 +12,5 @@ public class CurrencyExchangeAlertApplication {
         SpringApplication.run(CurrencyExchangeAlertApplication.class, args);
     }
 
+
 }

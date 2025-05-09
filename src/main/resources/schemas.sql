@@ -1,7 +1,7 @@
-DROP DATABASE IF EXISTS currency_rate;
-CREATE DATABASE currency_rate;
+DROP DATABASE IF EXISTS exchange_tracker;
+CREATE DATABASE exchange_tracker;
 
-USE currency_rate;
+USE exchange_tracker;
 
 DROP TABLE IF EXISTS users;
 CREATE TABLE users (
