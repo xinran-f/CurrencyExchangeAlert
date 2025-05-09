@@ -5,21 +5,28 @@ import org.sandyf.currencyexchangealert.dao.UserDao;
 import org.sandyf.currencyexchangealert.model.ExchangeAlert;
 import org.sandyf.currencyexchangealert.model.User;
 import org.springframework.beans.factory.annotation.Autowired;
+import org.springframework.beans.factory.annotation.Value;
 import org.springframework.scheduling.annotation.Scheduled;
 import org.springframework.stereotype.Service;
 import org.springframework.web.client.RestTemplate;
 
 import java.math.BigDecimal;
 import java.util.List;
+import java.util.Map;
 
 @Service
 public class ExchangeAlertService {
 
-    private final ExchangeAlertDao   exchangeAlertDao;
+    private final ExchangeAlertDao exchangeAlertDao;
     private final UserDao userDao;
-    private final RestTemplate       restTemplate;
+    private final RestTemplate restTemplate;
 
-    // include RestTemplate here!
+    @Value("${currencyfreaks.api.url}")
+    private String apiUrl;
+
+    @Value("${currencyfreaks.api.key}")
+    private String apiKey;
+
     @Autowired
     public ExchangeAlertService(ExchangeAlertDao exchangeAlertDao,
                                 UserDao userDao,
@@ -61,14 +68,28 @@ public class ExchangeAlertService {
         }
     }
 
+    /**
+     * Public method to allow controllers (or tests) to fetch a single rate.
+     */
+    public BigDecimal getCurrentRate(String baseCurrency, String targetCurrency) {
+        String url = String.format("%s?apikey=%s&base_currency=%s&symbols=%s",
+                apiUrl, apiKey, baseCurrency, targetCurrency);
+
+        @SuppressWarnings("unchecked")
+        Map<String,Object> resp = restTemplate.getForObject(url, Map.class);
+        @SuppressWarnings("unchecked")
+        Map<String,String> rates = (Map<String,String>) resp.get("rates");
+
+        return new BigDecimal(rates.get(targetCurrency));
+    }
+
     private BigDecimal fetchCurrentRate(String base, String target) {
         String url = String.format("%s?apikey=%s&base_currency=%s&symbols=%s",
-                System.getProperty("currencyfreaks.api.url"),
-                System.getProperty("currencyfreaks.api.key"),
-                base, target);
-        var response = restTemplate.getForObject(url, java.util.Map.class);
+                apiUrl, apiKey, base, target);
         @SuppressWarnings("unchecked")
-        var rates = (java.util.Map<String, String>) response.get("rates");
+        Map<String,Object> resp = restTemplate.getForObject(url, Map.class);
+        @SuppressWarnings("unchecked")
+        Map<String,String> rates = (Map<String,String>)resp.get("rates");
         return new BigDecimal(rates.get(target));
     }
 }

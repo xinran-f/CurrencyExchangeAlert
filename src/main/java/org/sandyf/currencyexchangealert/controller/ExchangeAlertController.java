@@ -6,28 +6,65 @@ import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.http.ResponseEntity;
 import org.springframework.web.bind.annotation.*;
 
+import java.math.BigDecimal;
+import java.net.URI;
 import java.util.List;
 
 @RestController
-@RequestMapping("/api/alerts")
+@RequestMapping("/api")
 public class ExchangeAlertController {
+
+    private final ExchangeAlertService alertService;
+
     @Autowired
-    private ExchangeAlertService alertService;
+    public ExchangeAlertController(ExchangeAlertService alertService) {
+        this.alertService = alertService;
+    }
 
-    @PostMapping
-    public ResponseEntity<String> createAlert(@RequestBody ExchangeAlert alert) {
+    /**
+     * POST /api/alerts
+     * Create a new exchange alert for a given userId.
+     * The service will look up the user’s email and insert the alert.
+     */
+    @PostMapping("/alerts")
+    public ResponseEntity<Void> createAlert(@RequestBody ExchangeAlert alert) {
         alertService.createAlert(alert);
-        return ResponseEntity.ok("Alert created");
+        // Return 201 Created with Location header pointing to the new resource
+        return ResponseEntity
+                .created(URI.create("/api/alerts/" + alert.getId()))
+                .build();
     }
 
-    @GetMapping
-    public List<ExchangeAlert> getAllAlerts() {
-        return alertService.getAllAlerts();
+    /**
+     * GET /api/alerts
+     * List all exchange alerts.
+     */
+    @GetMapping("/alerts")
+    public ResponseEntity<List<ExchangeAlert>> getAllAlerts() {
+        List<ExchangeAlert> alerts = alertService.getAllAlerts();
+        return ResponseEntity.ok(alerts);
     }
 
-    @DeleteMapping("/{id}")
-    public ResponseEntity<String> deleteAlert(@PathVariable int id) {
+    /**
+     * DELETE /api/alerts/{id}
+     * Delete an alert by its id.
+     */
+    @DeleteMapping("/alerts/{id}")
+    public ResponseEntity<Void> deleteAlert(@PathVariable int id) {
         alertService.deleteAlert(id);
-        return ResponseEntity.ok("Alert deleted");
+        return ResponseEntity.noContent().build();
+    }
+
+    /**
+     * GET /api/rate?base=USD&target=EUR
+     * Proxy call to CurrencyFreaks API returning the current rate.
+     */
+    @GetMapping("/rate")
+    public ResponseEntity<BigDecimal> getRate(
+            @RequestParam("base") String baseCurrency,
+            @RequestParam("target") String targetCurrency) {
+
+        BigDecimal rate = alertService.getCurrentRate(baseCurrency, targetCurrency);
+        return ResponseEntity.ok(rate);
     }
 }
