@@ -19,9 +19,9 @@ public class ExchangeAlertDao {
     }
 
     public void save(ExchangeAlert alert) {
-        String sql = "INSERT INTO exchange_alert (user_email, base_currency, target_currency, target_rate, notified) " +
-                "VALUES (?, ?, ?, ?, ?)";
+        String sql = "INSERT INTO exchange_alert (user_id, user_email, base_currency, target_currency, target_rate, notified) VALUES (?, ?, ?, ?, ?, ?)";
         jdbcTemplate.update(sql,
+                alert.getUserId(),
                 alert.getUserEmail(),
                 alert.getBaseCurrency(),
                 alert.getTargetCurrency(),

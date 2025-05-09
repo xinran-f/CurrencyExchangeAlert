@@ -1,7 +1,9 @@
 package org.sandyf.currencyexchangealert.service;
 
 import org.sandyf.currencyexchangealert.dao.ExchangeAlertDao;
+import org.sandyf.currencyexchangealert.dao.UserDao;
 import org.sandyf.currencyexchangealert.model.ExchangeAlert;
+import org.sandyf.currencyexchangealert.model.User;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.scheduling.annotation.Scheduled;
 import org.springframework.stereotype.Service;
@@ -13,18 +15,27 @@ import java.util.List;
 @Service
 public class ExchangeAlertService {
 
-    private final ExchangeAlertDao exchangeAlertDao;
-    private final RestTemplate restTemplate;
+    private final ExchangeAlertDao   exchangeAlertDao;
+    private final UserDao userDao;
+    private final RestTemplate       restTemplate;
 
-    private static final String API_URL = "https://api.currencyfreaks.com/latest?apikey=YOUR_API_KEY";
-
+    // include RestTemplate here!
     @Autowired
-    public ExchangeAlertService(ExchangeAlertDao exchangeAlertDao, RestTemplate restTemplate) {
+    public ExchangeAlertService(ExchangeAlertDao exchangeAlertDao,
+                                UserDao userDao,
+                                RestTemplate restTemplate) {
         this.exchangeAlertDao = exchangeAlertDao;
-        this.restTemplate = restTemplate;
+        this.userDao          = userDao;
+        this.restTemplate     = restTemplate;
     }
 
     public void createAlert(ExchangeAlert alert) {
+        // populate email from users table
+        User user = userDao.findById(alert.getUserId())
+                .orElseThrow(() ->
+                        new IllegalArgumentException(
+                                "No user with id=" + alert.getUserId()));
+        alert.setUserEmail(user.getEmail());
         exchangeAlertDao.save(alert);
     }
 
@@ -36,36 +47,28 @@ public class ExchangeAlertService {
         exchangeAlertDao.deleteById(id);
     }
 
-    // Check rates periodically and notify users
-    @Scheduled(fixedRate = 60000) // runs every 60 seconds
+    @Scheduled(fixedRate = 60000)
     public void checkRatesAndNotify() {
         List<ExchangeAlert> alerts = exchangeAlertDao.findUnnotified();
-
         for (ExchangeAlert alert : alerts) {
             BigDecimal currentRate = fetchCurrentRate(alert.getBaseCurrency(), alert.getTargetCurrency());
             if (currentRate != null && currentRate.compareTo(alert.getTargetRate()) >= 0) {
-                // Notify user (simple console log, could send email instead)
                 System.out.println("ALERT: " + alert.getUserEmail() +
-                        " - Rate for " + alert.getBaseCurrency() + " to " + alert.getTargetCurrency() +
-                        " reached target: " + currentRate);
-
-                // Mark as notified in DB
+                        " – Rate " + alert.getBaseCurrency() + "→" +
+                        alert.getTargetCurrency() + " = " + currentRate);
                 exchangeAlertDao.markAsNotified(alert.getId());
             }
         }
     }
 
-    // Helper method to fetch current rate from API
-    private BigDecimal fetchCurrentRate(String baseCurrency, String targetCurrency) {
-        String url = API_URL + "&base_currency=" + baseCurrency + "&symbols=" + targetCurrency;
-
-        try {
-            var response = restTemplate.getForObject(url, java.util.Map.class);
-            java.util.Map<String, String> rates = (java.util.Map<String, String>) response.get("rates");
-            return new BigDecimal(rates.get(targetCurrency));
-        } catch (Exception e) {
-            System.err.println("Error fetching rate: " + e.getMessage());
-            return null;
-        }
+    private BigDecimal fetchCurrentRate(String base, String target) {
+        String url = String.format("%s?apikey=%s&base_currency=%s&symbols=%s",
+                System.getProperty("currencyfreaks.api.url"),
+                System.getProperty("currencyfreaks.api.key"),
+                base, target);
+        var response = restTemplate.getForObject(url, java.util.Map.class);
+        @SuppressWarnings("unchecked")
+        var rates = (java.util.Map<String, String>) response.get("rates");
+        return new BigDecimal(rates.get(target));
     }
 }
